@@ -1,0 +1,2 @@
+D:\Projects\Programs C C++\RTSoft 1\Island\Debug\Island.exe
+D:\Projects\Programs C C++\RTSoft 1\Island\Debug\Island.pdb
