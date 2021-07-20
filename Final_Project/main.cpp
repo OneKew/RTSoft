@@ -1,49 +1,66 @@
 #include "opencv2/opencv.hpp"
+#include "opencv2/highgui/highgui.hpp"
+#include "opencv2/imgproc/imgproc.hpp"
 
 using namespace cv;
 using namespace std;
 
-int gmin = 0, gmax = 0;
+void select_roi(Mat &frame, Mat &res){
+  int rows = frame.rows;
+  int cols = frame.cols;
+
+  Point points[1][4];
+  points[0][0] = Point(cols*0.05, rows);
+  points[0][1] = Point(cols*0.1, rows*0.4);
+  points[0][2] = Point(cols*0.6, rows*0.4);
+  points[0][3] = Point(cols*0.95, rows);
+  Mat mask = Mat::zeros(frame.size(), CV_8UC1);
+  const Point* ppt[1] = {points[0]};
+  int npt[] = {4};
+  fillPoly(mask, ppt, npt, 1, Scalar(255,0,0), 8);
+  frame.copyTo(res, mask);
+  
+} 
 
 void RecognizeLines(Mat frame){
-    Mat edges, h;
-    vector<vector<Point> > contours; 
-    cvtColor(frame, frame, COLOR_BGR2GRAY); 
-//    cvtColor(frame, frame, COLOR_BGR2BGRA); 
-//    GaussianBlur(frame,edges, Size(5, 5), 0);
- //   Canny(edges, edges, 50, 150);
+  //  Rect rect(0, 0, frame.cols / 2, frame.rows / 2);  
+  resize(frame, frame, Size(1000, 800));
+ // int startX=0,startY=400,width=700,height=300;
+ //  Mat roi(frame, Rect(startX,startY,width,height));
 
-   // Rect roi(0, 0, img.cols / 2, img.rows / 2)  надо обрезать изображение до линии горизонта
-   
- //   cvtColor(frame, edges, COLOR_BGR2HSV);    я игрался с фильтрами
- //   cvtColor(frame, edges, COLOR_HSV2BGR);
-   
-    //                 скорее всего нужно BGR2GRAY как-то затемнить для лучшей контрастности
-    //                 и затем использовать канни и гауссово размытие и выделять полосы
-    //                 или придумай как выделить все белое на фильтре канни и будет четко
-
-   Mat tmp(frame.size(),CV_8U);
-
-   
-    Scalar colors[2] = {Scalar(210,210,210), Scalar(255,255,255)};
-    inRange(frame, colors[0], colors[1], tmp);
+    Mat edges;
+    Mat res;
+    Scalar colors[2] = {Scalar(210,210,210), Scalar(255,255,255)}; 
+    select_roi(frame, edges);
+    cvtColor(edges, edges, COLOR_BGR2GRAY);
+    Mat tmp(frame.size(),CV_8U);
+    inRange(edges, colors[0], colors[1], tmp);
     dilate(tmp,tmp,Mat(),Point(-1,-1),2); 
     erode(tmp,tmp,Mat(),Point(-1,-1),2);
-    GaussianBlur(tmp, tmp, Size( 1, 11 ), 0);
-    Canny(tmp,tmp,200,450);
-
-     //    imshow("Tracking Window", edges);
-   // findContours(tmp, contours, RETR_EXTERNAL, CHAIN_APPROX_NONE);
-
-   // imshow("Tracking Window", tmp);
+    GaussianBlur(edges, tmp, Size(9,9),0);
+    Canny(tmp, tmp, 50, 150);
     
-    imshow("Tracking Window 2", edges);
-    if (contours.size() == 1)
-        {
-            Rect br = boundingRect(contours[0]);           
-            rectangle(frame,br,Scalar(0,250,0),2);
-            drawContours(frame,contours,-1, (0,0,255), 3, LINE_AA);
-        }   
+    vector<Vec2f> lines;
+    HoughLines(tmp, lines, 3, CV_PI/180, 150, 0, 0 );
+    for( size_t i = 0; i < lines.size(); i++ ) {
+      float rho = lines[i][0], theta = lines[i][1];
+      Point pt1, pt2;
+      double a = cos(theta), b = sin(theta);
+      double x0 = a*rho, y0 = b*rho;
+      pt1.x = cvRound(x0 + 1000*(-b));
+      pt1.y = cvRound(y0 + 1000*(a));
+      pt2.x = cvRound(x0 - 1000*(-b));
+      pt2.y = cvRound(y0 - 1000*(a));
+      line( frame, pt1, pt2, Scalar(0,0,255), 3, LINE_AA);
+    }
+    
+
+
+
+    imshow("Tracking Window", edges);
+  //  imshow("Tracking Window 2", frame);
+
+  
 }
 
 
@@ -53,8 +70,8 @@ void RecognizeLines(Mat frame){
 
 int main(int argc, char* argv[]) {
 
-  //  VideoCapture cap("DRIVING.MP4"); 
-    VideoCapture cap("TEST.MOV"); 
+    VideoCapture cap("DRIVING.MP4"); 
+  //  VideoCapture cap("TEST.MOV"); 
     if ( !cap.isOpened() ) return -1;
     double fps = cap.get(CAP_PROP_FPS); 
     cout << "Frame per seconds : " << fps << endl;
@@ -71,10 +88,10 @@ int main(int argc, char* argv[]) {
         else 
         RecognizeLines(frame);
 
-        resize(frame, frame, Size (800, 600));
+        resize(frame, frame, Size (1000, 800));
 
       //  imshow("Tracking Window", frame);
-        if(waitKey(30) == 27) {
+        if(waitKey(2) == 1) {
             break;
         }
     }
