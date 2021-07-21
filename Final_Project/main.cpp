@@ -1,6 +1,8 @@
 #include "opencv2/opencv.hpp"
 #include "opencv2/highgui/highgui.hpp"
 #include "opencv2/imgproc/imgproc.hpp"
+#include "algorithm"
+
 
 using namespace cv;
 using namespace std;
@@ -8,57 +10,111 @@ using namespace std;
 void select_roi(Mat &frame, Mat &res){
   int rows = frame.rows;
   int cols = frame.cols;
-
   Point points[1][4];
-  points[0][0] = Point(cols*0.05, rows);
-  points[0][1] = Point(cols*0.1, rows*0.4);
-  points[0][2] = Point(cols*0.6, rows*0.4);
-  points[0][3] = Point(cols*0.95, rows);
+  points[0][0] = Point(cols*0, rows*0.85);
+  points[0][1] = Point(cols*0.285, rows*0.48);
+  points[0][2] = Point(cols*0.465, rows*0.48);
+  points[0][3] = Point(cols*0.72, rows*0.85);
   Mat mask = Mat::zeros(frame.size(), CV_8UC1);
   const Point* ppt[1] = {points[0]};
   int npt[] = {4};
   fillPoly(mask, ppt, npt, 1, Scalar(255,0,0), 8);
   frame.copyTo(res, mask);
-  
 } 
 
-void RecognizeLines(Mat frame){
-  //  Rect rect(0, 0, frame.cols / 2, frame.rows / 2);  
-  resize(frame, frame, Size(1000, 800));
- // int startX=0,startY=400,width=700,height=300;
- //  Mat roi(frame, Rect(startX,startY,width,height));
+Point ptleft1last, ptleft2last, ptright1last, ptright2last;
+int t = 0;
+int lxmax = 0, lymax = 1000, rxmax = 1000, rymax = 1000;
 
+void RecognizeLines(Mat frame){ 
+    if (t % 10 == 0){
+  //  ptright1last = ptright1;
+  //  ptright2last = ptright2;
+      lxmax = 0;
+      lymax = 1000;
+      rxmax = 1000;
+      rymax = 1000;
+    }
+
+  resize(frame, frame, Size(1000, 800));
     Mat edges;
-    Mat res;
-    Scalar colors[2] = {Scalar(210,210,210), Scalar(255,255,255)}; 
+    Mat tmp(frame.size(),CV_8U);
+    Scalar colors[2] = {Scalar(200,200,200), Scalar(255,255,255)}; 
     select_roi(frame, edges);
     cvtColor(edges, edges, COLOR_BGR2GRAY);
-    Mat tmp(frame.size(),CV_8U);
     inRange(edges, colors[0], colors[1], tmp);
-    dilate(tmp,tmp,Mat(),Point(-1,-1),2); 
-    erode(tmp,tmp,Mat(),Point(-1,-1),2);
-    GaussianBlur(edges, tmp, Size(9,9),0);
+    dilate(tmp,tmp,Mat(),Point(-1,-1),3); 
+    erode(tmp,tmp,Mat(),Point(-1,-1),3);
+    GaussianBlur(tmp, tmp, Size(5,5),0);
     Canny(tmp, tmp, 50, 150);
     
-    vector<Vec2f> lines;
-    HoughLines(tmp, lines, 3, CV_PI/180, 150, 0, 0 );
+    vector<Vec4i> lines;// left_lines, right_lines;
+    HoughLinesP(tmp, lines, 1, CV_PI/180, 0, 0, 100);
+    int left_lines [lines.size()][4] = {}, right_lines [lines.size()][4] = {};
+
     for( size_t i = 0; i < lines.size(); i++ ) {
-      float rho = lines[i][0], theta = lines[i][1];
-      Point pt1, pt2;
-      double a = cos(theta), b = sin(theta);
-      double x0 = a*rho, y0 = b*rho;
-      pt1.x = cvRound(x0 + 1000*(-b));
-      pt1.y = cvRound(y0 + 1000*(a));
-      pt2.x = cvRound(x0 - 1000*(-b));
-      pt2.y = cvRound(y0 - 1000*(a));
-      line( frame, pt1, pt2, Scalar(0,0,255), 3, LINE_AA);
+     
+      Vec4i l = lines[i];
+      if ((l[0] <= 390) && (l[2] <= 390)){
+        left_lines[i][0] = l[0];
+        left_lines[i][1] = l[1];
+        left_lines[i][2] = l[2];
+        left_lines[i][3] = l[3];
+      }
+      if ((l[0] > 390) && (l[2] > 390)) {
+        right_lines[i][0] = l[0];
+        right_lines[i][1] = l[1];
+        right_lines[i][2] = l[2];
+        right_lines[i][3] = l[3];
+      }
     }
-    
 
 
+    int l2 = 0, l3 = 1000;
+    int r2 = 1000, r3 = 1000;
 
-    imshow("Tracking Window", edges);
-  //  imshow("Tracking Window 2", frame);
+    for (size_t i = 0; i < lines.size(); i++){
+      if (left_lines[i][0] != 0) {
+        if (left_lines[i][2] > l2) l2 = left_lines[i][2];
+        if (left_lines[i][3] < l3) l3 = left_lines[i][3];
+      }
+      if (l2 > lxmax) lxmax = l2;
+      if (l3 < lymax) lymax = l3;
+      if (right_lines[i][0] != 0){
+        if (right_lines[i][2] < r2) r2 = right_lines[i][2];
+        if (right_lines[i][3] < r3) r3 = right_lines[i][3];
+      }
+      if ((r2 < rxmax)) rxmax = r2;
+      if ((r3 < rymax)) rymax = r3;
+    }
+
+    Point ptleft2, ptright2;
+    if ((l2 != 0)&&(l3 != 1000)) {
+    ptleft2.x = int(l2);
+    ptleft2.y = int(l3);
+    }
+    else {
+      ptleft2.x = 10;
+      ptleft2.y = 770;
+    }
+    if ((r2 != 1000)&&(r3 != 1000)){
+      ptright2.x = int(r2);
+      ptright2.y = int(r3);
+    }
+    else
+    {
+      ptright2.x = 660;
+      ptright2.y = 655;
+    }
+
+    t++;
+    line(frame, Point(660, 655), Point(rxmax, rymax), Scalar(0,0,255), 8, LINE_AA);
+    line(frame, Point(10, 770), Point(lxmax, lymax), Scalar(0,0,255), 8, LINE_AA);
+    line(frame, Point(10, 770), ptleft2, Scalar(0,0,255), 8, LINE_AA);
+    line(frame, Point(660, 655), ptright2, Scalar(0,0,255), 8, LINE_AA);
+
+    imshow("Tracking Window", frame);
+  //  imshow("Tracking Window2", tmp);
 
   
 }
@@ -72,15 +128,15 @@ int main(int argc, char* argv[]) {
 
     VideoCapture cap("DRIVING.MP4"); 
   //  VideoCapture cap("TEST.MOV"); 
+  //VideoCapture cap("test_driving3.1.mp4"); 
+
     if ( !cap.isOpened() ) return -1;
     double fps = cap.get(CAP_PROP_FPS); 
     cout << "Frame per seconds : " << fps << endl;
     namedWindow("Tracking Window",WINDOW_AUTOSIZE); 
-  //  createTrackbar("Trackbar1", "Tracking Window", &gmin, 1000);
-  //  createTrackbar("Trackbar2", "Tracking Window", &gmax, 1000);
      while(1) {
         Mat frame;
-        bool bSuccess = cap.read(frame); // read a new frame from video
+        bool bSuccess = cap.read(frame); 
         if (!bSuccess) {
             cout << "Cannot read the frame from video file" << endl;
             break;
@@ -88,9 +144,9 @@ int main(int argc, char* argv[]) {
         else 
         RecognizeLines(frame);
 
-        resize(frame, frame, Size (1000, 800));
+    //    resize(frame, frame, Size (1000, 800));
 
-      //  imshow("Tracking Window", frame);
+     //   imshow("Tracking Window", frame);
         if(waitKey(2) == 1) {
             break;
         }
