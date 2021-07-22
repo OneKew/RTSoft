@@ -12,7 +12,7 @@ void select_roi(Mat &frame, Mat &res){
   int cols = frame.cols;
   Point points[1][4];
   points[0][0] = Point(cols*0, rows*0.85);
-  points[0][1] = Point(cols*0.285, rows*0.48);
+  points[0][1] = Point(cols*0.277, rows*0.48);
   points[0][2] = Point(cols*0.465, rows*0.48);
   points[0][3] = Point(cols*0.72, rows*0.85);
   Mat mask = Mat::zeros(frame.size(), CV_8UC1);
@@ -27,9 +27,7 @@ int t = 0;
 int lxmax = 0, lymax = 1000, rxmax = 1000, rymax = 1000;
 
 void RecognizeLines(Mat frame){ 
-    if (t % 10 == 0){
-  //  ptright1last = ptright1;
-  //  ptright2last = ptright2;
+    if (t % 30 == 0){
       lxmax = 0;
       lymax = 1000;
       rxmax = 1000;
@@ -39,7 +37,7 @@ void RecognizeLines(Mat frame){
   resize(frame, frame, Size(1000, 800));
     Mat edges;
     Mat tmp(frame.size(),CV_8U);
-    Scalar colors[2] = {Scalar(200,200,200), Scalar(255,255,255)}; 
+    Scalar colors[2] = {Scalar(210,210,210), Scalar(255,255,255)}; 
     select_roi(frame, edges);
     cvtColor(edges, edges, COLOR_BGR2GRAY);
     inRange(edges, colors[0], colors[1], tmp);
@@ -48,8 +46,8 @@ void RecognizeLines(Mat frame){
     GaussianBlur(tmp, tmp, Size(5,5),0);
     Canny(tmp, tmp, 50, 150);
     
-    vector<Vec4i> lines;// left_lines, right_lines;
-    HoughLinesP(tmp, lines, 1, CV_PI/180, 0, 0, 100);
+    vector<Vec4i> lines;
+    HoughLinesP(tmp, lines, 2, CV_PI/180, 0, 0, 100);
     int left_lines [lines.size()][4] = {}, right_lines [lines.size()][4] = {};
 
     for( size_t i = 0; i < lines.size(); i++ ) {
@@ -97,7 +95,7 @@ void RecognizeLines(Mat frame){
       ptleft2.x = 10;
       ptleft2.y = 770;
     }
-    if ((r2 != 1000)&&(r3 != 1000)){
+    if ((r2 != 1000) && (r3 != 1000)){
       ptright2.x = int(r2);
       ptright2.y = int(r3);
     }
@@ -108,13 +106,11 @@ void RecognizeLines(Mat frame){
     }
 
     t++;
-    line(frame, Point(660, 655), Point(rxmax, rymax), Scalar(0,0,255), 8, LINE_AA);
-    line(frame, Point(10, 770), Point(lxmax, lymax), Scalar(0,0,255), 8, LINE_AA);
-    line(frame, Point(10, 770), ptleft2, Scalar(0,0,255), 8, LINE_AA);
-    line(frame, Point(660, 655), ptright2, Scalar(0,0,255), 8, LINE_AA);
+    line(frame, Point(10, 770), ((ptleft2 + Point(lxmax, lymax)) / 2), Scalar(0,0,255), 8, LINE_AA);
+    line(frame, Point(665, 655), ((ptright2 + Point(rxmax, rymax)) / 2), Scalar(0,0,255), 8, LINE_AA);
 
     imshow("Tracking Window", frame);
-  //  imshow("Tracking Window2", tmp);
+   // imshow("Tracking Window2", tmp);
 
   
 }
@@ -126,9 +122,7 @@ void RecognizeLines(Mat frame){
 
 int main(int argc, char* argv[]) {
 
-    VideoCapture cap("DRIVING.MP4"); 
-  //  VideoCapture cap("TEST.MOV"); 
-  //VideoCapture cap("test_driving3.1.mp4"); 
+    VideoCapture cap("DRIVING.MOV");  
 
     if ( !cap.isOpened() ) return -1;
     double fps = cap.get(CAP_PROP_FPS); 
